@@ -6,11 +6,12 @@ import plus.gaga.middleware.sdk.domain.model.ChatCompletionSyncResponse;
 import plus.gaga.middleware.sdk.domain.model.Model;
 import plus.gaga.middleware.sdk.types.utils.BearerTokenUtils;
 
-import javax.net.ssl.HttpsURLConnection;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.ProtocolException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -39,23 +40,24 @@ public class OpenAiCodeReview {
 
         System.out.println("diff code：" + diffCode.toString());
 
-        // 2.ChatGLM 代码评审
+        // 2. chatglm 代码评审
         String log = codeReview(diffCode.toString());
-        System.out.println("code review:" + log);
-
+        System.out.println("code review：" + log);
     }
 
-    private static String codeReview(String diffCode) throws Exception{
-        String ApiKeySecret = "59de6d62732748fbba0f7503843c3506.9MixyWalBKHC96Pr";
-        String token = BearerTokenUtils.getToken(ApiKeySecret);
+    private static String codeReview(String diffCode) throws Exception {
+
+        String apiKeySecret = "c78fbacd3e10118ad5649d7a54a3a163.UunYDBxpzeClvSKZ";
+        String token = BearerTokenUtils.getToken(apiKeySecret);
 
         URL url = new URL("https://open.bigmodel.cn/api/paas/v4/chat/completions");
-        HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+
         connection.setRequestMethod("POST");
         connection.setRequestProperty("Authorization", "Bearer " + token);
         connection.setRequestProperty("Content-Type", "application/json");
         connection.setRequestProperty("User-Agent", "Mozilla/4.0 (compatible; MSIE 5.0; Windows NT; DigExt)");
-        connection .setDoOutput(true);
+        connection.setDoOutput(true);
 
         ChatCompletionRequest chatCompletionRequest = new ChatCompletionRequest();
         chatCompletionRequest.setModel(Model.GLM_4_FLASH.getCode());
@@ -68,29 +70,29 @@ public class OpenAiCodeReview {
             }
         });
 
-        try(OutputStream os = connection.getOutputStream()){
+        try (OutputStream os = connection.getOutputStream()) {
             byte[] input = JSON.toJSONString(chatCompletionRequest).getBytes(StandardCharsets.UTF_8);
             os.write(input);
-        };
+        }
 
         int responseCode = connection.getResponseCode();
         System.out.println(responseCode);
 
         BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
         String inputLine;
+
         StringBuilder content = new StringBuilder();
-        while((inputLine = in.readLine()) != null) {
+        while ((inputLine = in.readLine()) != null) {
             content.append(inputLine);
         }
 
         in.close();
         connection.disconnect();
 
-        System.out.println(content);
+        System.out.println("评审结果：" + content.toString());
 
         ChatCompletionSyncResponse response = JSON.parseObject(content.toString(), ChatCompletionSyncResponse.class);
         return response.getChoices().get(0).getMessage().getContent();
     }
-
 
 }
