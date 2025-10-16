@@ -39,6 +39,7 @@ public class OpenAiCodeReview {
         // 2.ChatGLM 代码评审
         String log = codeReview(diffCode.toString());
         System.out.println("code review:" + log);
+
     }
 
     private static String codeReview(String diffCode) throws Exception{
