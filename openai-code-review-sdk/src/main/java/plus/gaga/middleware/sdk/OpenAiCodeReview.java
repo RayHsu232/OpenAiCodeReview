@@ -1,26 +1,32 @@
 package plus.gaga.middleware.sdk;
 
 import com.alibaba.fastjson2.JSON;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import plus.gaga.middleware.sdk.domain.model.ChatCompletionRequest;
 import plus.gaga.middleware.sdk.domain.model.ChatCompletionSyncResponse;
 import plus.gaga.middleware.sdk.domain.model.Model;
 import plus.gaga.middleware.sdk.types.utils.BearerTokenUtils;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.ProtocolException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.Random;
 
 public class OpenAiCodeReview {
 
     public static void main(String[] args) throws Exception {
-        System.out.println("测试执行");
+        System.out.println("openai 代码评审测试执行");
 
+        String token = System.getenv("GITHUB_TOKEN");
+        if (null == token || "".equals(token)) {
+            throw new RuntimeException("Token is empty");
+        }
         // 1. 代码检出
         ProcessBuilder processBuilder = new ProcessBuilder("git", "diff", "HEAD~1", "HEAD");
         processBuilder.directory(new File("."));
@@ -43,6 +49,9 @@ public class OpenAiCodeReview {
         // 2. chatglm 代码评审
         String log = codeReview(diffCode.toString());
         System.out.println("code review：" + log);
+
+        // 3. 评审log记录
+        writeLog(token, log);
     }
 
     private static String codeReview(String diffCode) throws Exception {
@@ -93,6 +102,42 @@ public class OpenAiCodeReview {
 
         ChatCompletionSyncResponse response = JSON.parseObject(content.toString(), ChatCompletionSyncResponse.class);
         return response.getChoices().get(0).getMessage().getContent();
+    }
+
+    private static String writeLog(String Token, String log) throws Exception {
+        Git git = Git.cloneRepository().setURI("")
+                .setDirectory(new File("repo"))
+                .setCredentialsProvider(new UsernamePasswordCredentialsProvider(Token, ""))
+                .call();
+
+        String dateFolderName = new SimpleDateFormat("yyyy-MM-dd").format(new Date());
+        File dateFolder = new File("repo/" + dateFolderName);
+        if (!dateFolder.exists()) {
+            dateFolder.mkdir();
+        }
+
+        String FileName = generateRandomString(12) + ".md";
+        File newFile = new File(dateFolder, FileName);
+
+        try (FileWriter writer = new FileWriter(newFile)) {
+            writer.write(log);
+        }
+        git.add().addFilepattern(dateFolderName + "/" + FileName).call();
+        git.commit().setMessage("Add New File").call();
+        git.push().setCredentialsProvider(new UsernamePasswordCredentialsProvider(Token, ""));
+
+
+        return "https://github.com/RayHsu232/code-review-log/blob/master/" + dateFolderName + "/" + FileName;
+    }
+
+    private static String generateRandomString(int length) {
+        String Characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        Random random = new Random();
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < length; i++) {
+            sb.append(Characters.charAt(random.nextInt(Characters.length())));
+        }
+        return sb.toString();
     }
 
 }
